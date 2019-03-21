@@ -33,8 +33,9 @@ func Test(t *testing.T) {
 }
 
 func TestWithContextCancel(t *testing.T) {
+	var g Group
 	ctx, cancel := context.WithCancel(context.Background())
-	g := WithContext(ctx)
+	g = WithContext(ctx, g)
 
 	err1 := errors.New("first")
 	err2 := errors.New("second")
@@ -57,8 +58,9 @@ func TestWithContextCancel(t *testing.T) {
 }
 
 func TestWithContextStop(t *testing.T) {
+	var g Group
 	ctx, cancel := context.WithCancel(context.Background())
-	g := WithContext(ctx)
+	g = WithContext(ctx, g)
 
 	wait := make(chan struct{})
 	err1 := errors.New("first")

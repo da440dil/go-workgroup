@@ -5,8 +5,8 @@ import "context"
 
 // WithContext allocates and returns new Group.
 // Context allows cancelling execution.
-func WithContext(ctx context.Context) *Group {
-	return &Group{ctx: ctx}
+func WithContext(ctx context.Context, group Group) Group {
+	return Group{ctx: ctx, fns: group.fns}
 }
 
 // Group is a group of related goroutines.

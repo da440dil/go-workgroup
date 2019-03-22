@@ -24,10 +24,11 @@ func main() {
 		cancel()
 	}()
 
-	wg := workgroup.WithContext(ctx)
+	var wg workgroup.Group
 	wg.Add(serveHTTP("127.0.0.1:8081", newServeMux("I'm ready")))
 	wg.Add(serveHTTP("127.0.0.1:8082", newServeMux("I'm live")))
 	wg.Add(listenSignal(os.Interrupt))
+	wg = workgroup.WithContext(ctx, wg)
 	if err := wg.Wait(); err != nil {
 		fmt.Println("error:", err)
 	}

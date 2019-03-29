@@ -5,89 +5,83 @@ Synchronization for groups of related goroutines.
 ## Example
 
 ```go
-import (
-	"context"
-	"fmt"
-	"net/http"
-	"os"
-	"os/signal"
-	"time"
+// Create workgroup
+var wg workgroup.Group
 
-	"github.com/da440dil/go-workgroup"
-)
+// Add function to start http server
+wg.Add(func(stop <-chan struct{}) error {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Hello, World!")
+	})
 
-func main() {
-	ctx, cancel := context.WithCancel(context.Background())
+	addr := "127.0.0.1:8080"
+	srv := http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+
+	done := make(chan error, 2)
 	go func() {
-		time.Sleep(time.Second * 10)
-		fmt.Println("cancel context")
-		cancel()
+		<-stop
+		fmt.Println("Server is about to stop")
+		done <- srv.Shutdown(context.Background())
 	}()
 
-	var wg workgroup.Group
-	wg.Add(serveHTTP("127.0.0.1:8081", newServeMux("I'm ready")))
-	wg.Add(serveHTTP("127.0.0.1:8082", newServeMux("I'm live")))
-	wg.Add(listenSignal(os.Interrupt))
-	wg = workgroup.WithContext(ctx, wg)
-	if err := wg.Wait(); err != nil {
-		fmt.Println("error:", err)
-	}
+	go func() {
+		fmt.Printf("Server starts listening at %s\n", addr)
+		done <- srv.ListenAndServe()
+	}()
 
-	// server listen 127.0.0.1:8081
-	// server listen 127.0.0.1:8082
-	// listen os signal
-	// cancel context
-	// stop listening os signal
-	// stop listening 127.0.0.1:8082
-	// stop listening 127.0.0.1:8081
-	// error: context canceled
-}
-
-func serveHTTP(addr string, handler http.Handler) workgroup.Func {
-	return func(stop <-chan struct{}) error {
-		srv := http.Server{
-			Addr:    addr,
-			Handler: handler,
+	for i := 0; i < cap(done); i++ {
+		if err := <-done; err != nil && err != http.ErrServerClosed {
+			fmt.Printf("Server stopped with error %v\n", err)
+			return err
 		}
-
-		go func() {
-			<-stop
-			srv.Shutdown(context.Background())
-		}()
-
-		defer fmt.Println("stop listening", addr)
-
-		fmt.Println("server listen", addr)
-		return srv.ListenAndServe()
 	}
+	fmt.Println("Server stopped")
+	return nil
+})
+
+// Add function to start listening os signal
+wg.Add(func(stop <-chan struct{}) error {
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt)
+	go func() {
+		<-stop
+		close(sig)
+	}()
+
+	fmt.Println("Server starts listening os signal")
+	<-sig
+	fmt.Println("Server stops listening os signal")
+	signal.Stop(sig)
+	return nil
+})
+
+// Create context to cancel execution
+ctx, cancel := context.WithCancel(context.Background())
+go func() {
+	time.Sleep(time.Second * 10)
+	fmt.Println("Cancel context")
+	cancel()
+}()
+
+// Create workgroup with context
+wg = workgroup.WithContext(ctx, wg)
+
+// Execute each function
+if err := wg.Run(); err != nil {
+	fmt.Println("Error:", err)
 }
 
-func newServeMux(v string) *http.ServeMux {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
-		fmt.Fprintln(res, v)
-	})
-	return mux
-}
-
-func listenSignal(v ...os.Signal) workgroup.Func {
-	return func(stop <-chan struct{}) error {
-		sig := make(chan os.Signal)
-		signal.Notify(sig, v...)
-
-		go func() {
-			<-stop
-			close(sig)
-		}()
-
-		fmt.Println("listen os signal")
-		<-sig
-		signal.Stop(sig)
-		fmt.Println("stop listening os signal")
-
-		return nil
-	}
-}
+// Server starts listening at 127.0.0.1:8080
+// Server starts listening os signal
+// Cancel context
+// Server stops listening os signal
+// Server is about to stop
+// Server stopped
+// Error: context canceled
 ```
 
 Inspired by [workgroup](https://github.com/heptio/workgroup) package.

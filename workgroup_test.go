@@ -26,7 +26,7 @@ func Test(t *testing.T) {
 
 	result := make(chan error)
 	go func() {
-		result <- g.Wait()
+		result <- g.Run()
 	}()
 	close(wait)
 	assert.Equal(t, err1, <-result)
@@ -51,7 +51,7 @@ func TestWithContextCancel(t *testing.T) {
 
 	result := make(chan error)
 	go func() {
-		result <- g.Wait()
+		result <- g.Run()
 	}()
 	cancel()
 	assert.Equal(t, context.Canceled, <-result)
@@ -77,7 +77,7 @@ func TestWithContextStop(t *testing.T) {
 
 	result := make(chan error)
 	go func() {
-		result <- g.Wait()
+		result <- g.Run()
 	}()
 	close(wait)
 	assert.Equal(t, err2, <-result)
@@ -87,6 +87,6 @@ func TestWithContextStop(t *testing.T) {
 func TestZero(t *testing.T) {
 	var g Group
 
-	err := g.Wait()
+	err := g.Run()
 	assert.NoError(t, err)
 }

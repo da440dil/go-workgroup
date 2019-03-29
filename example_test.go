@@ -12,74 +12,81 @@ import (
 )
 
 func Example() {
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		time.Sleep(time.Second * 10)
-		fmt.Println("cancel context")
-		cancel()
-	}()
-
+	// Create workgroup
 	var wg workgroup.Group
-	wg.Add(serveHTTP("127.0.0.1:8081", newServeMux("I'm ready")))
-	wg.Add(serveHTTP("127.0.0.1:8082", newServeMux("I'm live")))
-	wg.Add(listenSignal(os.Interrupt))
-	wg = workgroup.WithContext(ctx, wg)
-	if err := wg.Wait(); err != nil {
-		fmt.Println("error:", err)
-	}
 
-	// server listen 127.0.0.1:8081
-	// server listen 127.0.0.1:8082
-	// listen os signal
-	// cancel context
-	// stop listening os signal
-	// stop listening 127.0.0.1:8082
-	// stop listening 127.0.0.1:8081
-	// error: context canceled
-}
+	// Add function to start http server
+	wg.Add(func(stop <-chan struct{}) error {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintln(w, "Hello, World!")
+		})
 
-func serveHTTP(addr string, handler http.Handler) workgroup.Func {
-	return func(stop <-chan struct{}) error {
+		addr := "127.0.0.1:8080"
 		srv := http.Server{
 			Addr:    addr,
-			Handler: handler,
+			Handler: mux,
 		}
 
+		done := make(chan error, 2)
 		go func() {
 			<-stop
-			srv.Shutdown(context.Background())
+			fmt.Println("Server is about to stop")
+			done <- srv.Shutdown(context.Background())
 		}()
 
-		defer fmt.Println("stop listening", addr)
+		go func() {
+			fmt.Printf("Server starts listening at %s\n", addr)
+			done <- srv.ListenAndServe()
+		}()
 
-		fmt.Println("server listen", addr)
-		return srv.ListenAndServe()
-	}
-}
-
-func newServeMux(v string) *http.ServeMux {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
-		fmt.Fprintln(res, v)
+		for i := 0; i < cap(done); i++ {
+			if err := <-done; err != nil && err != http.ErrServerClosed {
+				fmt.Printf("Server stopped with error %v\n", err)
+				return err
+			}
+		}
+		fmt.Println("Server stopped")
+		return nil
 	})
-	return mux
-}
 
-func listenSignal(v ...os.Signal) workgroup.Func {
-	return func(stop <-chan struct{}) error {
-		sig := make(chan os.Signal)
-		signal.Notify(sig, v...)
-
+	// Add function to start listening os signal
+	wg.Add(func(stop <-chan struct{}) error {
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, os.Interrupt)
 		go func() {
 			<-stop
 			close(sig)
 		}()
 
-		fmt.Println("listen os signal")
+		fmt.Println("Server starts listening os signal")
 		<-sig
+		fmt.Println("Server stops listening os signal")
 		signal.Stop(sig)
-		fmt.Println("stop listening os signal")
-
 		return nil
+	})
+
+	// Create context to cancel execution
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(time.Second * 10)
+		fmt.Println("Cancel context")
+		cancel()
+	}()
+
+	// Create workgroup with context
+	wg = workgroup.WithContext(ctx, wg)
+
+	// Execute each function
+	if err := wg.Run(); err != nil {
+		fmt.Println("Error:", err)
 	}
+
+	// Server starts listening at 127.0.0.1:8080
+	// Server starts listening os signal
+	// Cancel context
+	// Server stops listening os signal
+	// Server is about to stop
+	// Server stopped
+	// Error: context canceled
 }

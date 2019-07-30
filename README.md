@@ -1,5 +1,8 @@
 # go-workgroup
 
+[![Build Status](https://travis-ci.com/da440dil/go-workgroup.svg?branch=master)](https://travis-ci.com/da440dil/go-workgroup)
+[![GoDoc](https://godoc.org/github.com/da440dil/go-workgroup?status.svg)](https://godoc.org/github.com/da440dil/go-workgroup)
+
 Synchronization for groups of related goroutines.
 
 ## Example

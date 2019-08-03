@@ -3,6 +3,7 @@ package workgroup
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,9 +34,8 @@ func Test(t *testing.T) {
 }
 
 func TestWithContextCancel(t *testing.T) {
-	var g Group
 	ctx, cancel := context.WithCancel(context.Background())
-	g = WithContext(ctx, g)
+	g := NewGroup(WithContext(ctx))
 
 	err1 := errors.New("first")
 	err2 := errors.New("second")
@@ -58,9 +58,8 @@ func TestWithContextCancel(t *testing.T) {
 }
 
 func TestWithContextStop(t *testing.T) {
-	var g Group
 	ctx, cancel := context.WithCancel(context.Background())
-	g = WithContext(ctx, g)
+	g := NewGroup(WithContext(ctx))
 
 	wait := make(chan struct{})
 	err1 := errors.New("first")
@@ -84,7 +83,36 @@ func TestWithContextStop(t *testing.T) {
 	cancel()
 }
 
-func TestZero(t *testing.T) {
+func TestWithSignal(t *testing.T) {
+	g := NewGroup(WithSignal(os.Interrupt))
+
+	wait := make(chan struct{})
+	err1 := errors.New("first")
+	err2 := errors.New("second")
+
+	g.Add(func(<-chan struct{}) error {
+		<-wait
+		return err1
+	})
+	g.Add(func(stop <-chan struct{}) error {
+		<-stop
+		return err2
+	})
+
+	result := make(chan error)
+	go func() {
+		result <- g.Run()
+	}()
+	close(wait)
+	assert.Equal(t, err1, <-result)
+}
+
+func TestWithSignalEmpty(t *testing.T) {
+	g := NewGroup(WithSignal())
+	assert.Equal(t, len(g.fns), 0)
+}
+
+func TestZeroValue(t *testing.T) {
 	var g Group
 
 	err := g.Run()

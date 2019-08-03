@@ -1,21 +1,69 @@
 // Package workgroup provides synchronization for groups of related goroutines.
 package workgroup
 
-import "context"
+import (
+	"context"
+	"os"
+	"os/signal"
+)
 
-// WithContext allocates and returns new Group.
-// Context allows cancelling execution.
-// Created group contains all functions added to the passed group.
-func WithContext(ctx context.Context, group Group) Group {
-	return Group{ctx: ctx, fns: group.fns}
+// Option is function returned by functions for setting options.
+type Option func(g *Group)
+
+// WithContext is helper function which adds a function to the Group
+// for cancelling execution using context.
+func WithContext(ctx context.Context) Option {
+	return func(g *Group) {
+		g.Add(func(stop <-chan struct{}) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-stop:
+				return nil
+			}
+		})
+	}
+}
+
+// WithSignal is helper function which adds a function to the Group
+// for cancelling execution using notifications on os signals.
+func WithSignal(sig ...os.Signal) Option {
+	return func(g *Group) {
+		if len(sig) == 0 {
+			return
+		}
+		g.Add(func(stop <-chan struct{}) error {
+			ch := make(chan os.Signal, len(sig))
+			signal.Notify(ch, sig...)
+			select {
+			case <-stop:
+			case <-ch:
+			}
+			signal.Stop(ch)
+			close(ch)
+			return nil
+		})
+	}
 }
 
 // Group is a group of related goroutines.
 // The zero value for a Group is fully usable without initialization.
 type Group struct {
 	fns []Func
-	ctx context.Context
 }
+
+// NewGroup creates new Group.
+func NewGroup(options ...Option) *Group {
+	g := &Group{}
+	for _, fn := range options {
+		fn(g)
+	}
+	return g
+}
+
+// Func is a function to execute with other related functions in its own goroutine.
+// The closure of the channel passed to Func should trigger return.
+type Func func(<-chan struct{}) error
 
 // Add adds a function to the Group.
 // The function will be exectuted in its own goroutine when Run is called.
@@ -30,26 +78,13 @@ func (g *Group) Add(fn Func) {
 // which should in turn, return.
 // The return value from the first function to exit will be returned to the caller of Run.
 func (g *Group) Run() error {
-	if len(g.fns) < 1 {
+	if len(g.fns) == 0 {
 		return nil
 	}
 
-	fns := g.fns
-	if g.ctx != nil {
-		fns = append(g.fns, func(stop <-chan struct{}) error {
-			select {
-			case <-g.ctx.Done():
-				return g.ctx.Err()
-			case <-stop:
-				return nil
-			}
-		})
-	}
-	g.fns = nil
-
 	stop := make(chan struct{})
-	done := make(chan error, len(fns))
-	for _, fn := range fns {
+	done := make(chan error, len(g.fns))
+	for _, fn := range g.fns {
 		go func(fn Func) {
 			done <- fn(stop)
 		}(fn)
@@ -67,7 +102,3 @@ func (g *Group) Run() error {
 	close(done)
 	return err
 }
-
-// Func is a function to execute with other related functions in its own goroutine.
-// The closure of the channel passed to Func should trigger return.
-type Func func(<-chan struct{}) error

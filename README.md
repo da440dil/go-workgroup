@@ -33,7 +33,6 @@ func main() {
 	}()
 	// Create workgroup
 	wg := workgroup.NewGroup(workgroup.WithContext(ctx))
-	workgroup.WithContext(ctx)(wg)
 	// Add function to cancel execution using os signal
 	wg.Add(func(stop <-chan struct{}) error {
 		done := make(chan os.Signal, 1)

@@ -3,8 +3,6 @@ package workgroup
 
 import (
 	"context"
-	"os"
-	"os/signal"
 )
 
 // Option is function returned by functions for setting options.
@@ -25,31 +23,10 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
-// WithSignal is helper function which adds a function to the Group
-// for cancelling execution using notifications on os signals.
-func WithSignal(sig ...os.Signal) Option {
-	return func(g *Group) {
-		if len(sig) == 0 {
-			return
-		}
-		g.Add(func(stop <-chan struct{}) error {
-			ch := make(chan os.Signal, len(sig))
-			signal.Notify(ch, sig...)
-			select {
-			case <-stop:
-			case <-ch:
-			}
-			signal.Stop(ch)
-			close(ch)
-			return nil
-		})
-	}
-}
-
 // Group is a group of related goroutines.
 // The zero value for a Group is fully usable without initialization.
 type Group struct {
-	fns []Func
+	fns []Run
 }
 
 // NewGroup creates new Group.
@@ -61,14 +38,14 @@ func NewGroup(options ...Option) *Group {
 	return g
 }
 
-// Func is a function to execute with other related functions in its own goroutine.
-// The closure of the channel passed to Func should trigger return.
-type Func func(<-chan struct{}) error
+// Run is a function to execute with other related functions in its own goroutine.
+// The closure of the channel passed to Run should trigger return.
+type Run func(<-chan struct{}) error
 
 // Add adds a function to the Group.
 // The function will be exectuted in its own goroutine when Run is called.
 // Add must be called before Run.
-func (g *Group) Add(fn Func) {
+func (g *Group) Add(fn Run) {
 	g.fns = append(g.fns, fn)
 }
 
@@ -85,7 +62,7 @@ func (g *Group) Run() error {
 	stop := make(chan struct{})
 	done := make(chan error, len(g.fns))
 	for _, fn := range g.fns {
-		go func(fn Func) {
+		go func(fn Run) {
 			done <- fn(stop)
 		}(fn)
 	}

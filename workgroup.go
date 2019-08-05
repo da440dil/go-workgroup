@@ -18,8 +18,8 @@ func (g *Group) Add(fn Run) {
 	g.fns = append(g.fns, fn)
 }
 
-// Run exectues each function registered via Add in its own goroutine.
-// Run blocks until all functions have returned.
+// Run executes each function registered via Add in its own goroutine.
+// Blocks execution until all functions have returned.
 // The first function to return will trigger the closure of the channel passed to each function,
 // which should in turn, return.
 // The return value from the first function to exit will be returned to the caller of Run.

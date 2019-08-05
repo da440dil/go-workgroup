@@ -1,46 +1,15 @@
 // Package workgroup provides synchronization for groups of related goroutines.
 package workgroup
 
-import (
-	"context"
-)
-
-// Option is function returned by functions for setting options.
-type Option func(g *Group)
-
-// WithContext is helper function which adds a function to the Group
-// for cancelling execution using context.
-func WithContext(ctx context.Context) Option {
-	return func(g *Group) {
-		g.Add(func(stop <-chan struct{}) error {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-stop:
-				return nil
-			}
-		})
-	}
-}
+// Run is a function to execute with other related functions in its own goroutine.
+// The closure of the channel passed to Run should trigger return.
+type Run func(<-chan struct{}) error
 
 // Group is a group of related goroutines.
 // The zero value for a Group is fully usable without initialization.
 type Group struct {
 	fns []Run
 }
-
-// NewGroup creates new Group.
-func NewGroup(options ...Option) *Group {
-	g := &Group{}
-	for _, fn := range options {
-		fn(g)
-	}
-	return g
-}
-
-// Run is a function to execute with other related functions in its own goroutine.
-// The closure of the channel passed to Run should trigger return.
-type Run func(<-chan struct{}) error
 
 // Add adds a function to the Group.
 // The function will be exectuted in its own goroutine when Run is called.

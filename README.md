@@ -24,15 +24,23 @@ import (
 )
 
 func main() {
-	// Create context to cancel execution after 5 seconds
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		time.Sleep(time.Second * 5)
-		fmt.Println("Context cancel")
-		cancel()
-	}()
 	// Create workgroup
-	wg := workgroup.NewGroup(workgroup.WithContext(ctx))
+	var wg workgroup.Group
+	// Add function to cancel execution after 5 seconds
+	wg.Add(func(stop <-chan struct{}) error {
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			time.Sleep(time.Second * 5)
+			fmt.Println("Context cancel")
+			cancel()
+		}()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-stop:
+			return nil
+		}
+	})
 	// Add function to cancel execution using os signal
 	wg.Add(func(stop <-chan struct{}) error {
 		done := make(chan os.Signal, 1)

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	g "github.com/da440dil/go-workgroup"
-	gc "github.com/da440dil/go-workgroup/context"
-	gq "github.com/da440dil/go-workgroup/quit"
+	gc "github.com/da440dil/go-workgroup/template/context"
+	gq "github.com/da440dil/go-workgroup/template/quit"
 )
 
 func ExampleNew_hTTPServer() {

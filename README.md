@@ -23,6 +23,9 @@ wg.Add(func(stop <-chan struct{}) error {
 	// Start http server
 	return srv.ListenAndServe()
 })
+if err := wg.Run(); err != nil {
+	// Handle err
+}
 ```
 
 ## Example usage

@@ -10,10 +10,10 @@ import (
 func ExampleGroup() {
 	var g workgroup.Group
 
-	done := make(chan struct{})
+	wait := make(chan struct{})
 
 	g.Add(func(<-chan struct{}) error {
-		<-done
+		<-wait
 		fmt.Println("one")
 		return errors.New("three")
 	})
@@ -27,7 +27,8 @@ func ExampleGroup() {
 	go func() {
 		result <- g.Run()
 	}()
-	close(done)
+
+	close(wait)
 	fmt.Printf("%v\n", <-result)
 	// Output:
 	// one

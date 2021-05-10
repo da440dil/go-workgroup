@@ -5,6 +5,7 @@ import (
 	"os/signal"
 )
 
+// Signal creates function for canceling execution using os signal.
 func Signal(sig ...os.Signal) RunFunc {
 	return func(stop <-chan struct{}) error {
 		if len(sig) == 0 {

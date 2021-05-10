@@ -8,27 +8,6 @@
 
 Synchronization for groups of related goroutines.
 
-## Basic usage
-
-```go
-// Create workgroup
-var wg workgroup.Group
-// Create http server
-srv := http.Server{Addr: "127.0.0.1:8080"}
-wg.Add(func(stop <-chan struct{}) error {
-	go func() {
-		<-stop
-		// Stop http server
-		srv.Close()
-	}()
-	// Start http server
-	return srv.ListenAndServe()
-})
-if err := wg.Run(); err != nil {
-	// Handle err
-}
-```
-
 ## Example HTTP server
 
 ```go

@@ -1,28 +1,26 @@
 // Package workgroup provides synchronization for groups of related goroutines.
 package workgroup
 
-// Run is a function to execute with other related functions in its own goroutine.
-// The closure of the channel passed to Run should trigger return.
-type Run func(<-chan struct{}) error
+// RunFunc is a function to execute with other related functions in its own goroutine.
+// The closure of the channel passed to RunFunc should trigger return.
+type RunFunc func(<-chan struct{}) error
 
 // Group is a group of related goroutines.
 // The zero value for a Group is fully usable without initialization.
 type Group struct {
-	fns []Run
+	fns []RunFunc
 }
 
 // Add adds a function to the Group.
 // The function will be exectuted in its own goroutine when Run is called.
 // Add must be called before Run.
-func (g *Group) Add(fn Run) {
+func (g *Group) Add(fn RunFunc) {
 	g.fns = append(g.fns, fn)
 }
 
 // Run executes each function registered via Add in its own goroutine.
-// Blocks execution until all functions have returned.
-// The first function to return will trigger the closure of the channel passed to each function,
-// which should in turn, return.
-// The return value from the first function to exit will be returned to the caller of Run.
+// Run blocks until all functions have returned, then returns the first non-nil error (if any) from them.
+// The first function to return will trigger the closure of the channel passed to each function, which should in turn, return.
 func (g *Group) Run() error {
 	if len(g.fns) == 0 {
 		return nil
@@ -30,21 +28,24 @@ func (g *Group) Run() error {
 
 	stop := make(chan struct{})
 	done := make(chan error, len(g.fns))
+	defer close(done)
+
 	for _, fn := range g.fns {
-		go func(fn Run) {
+		go func(fn RunFunc) {
 			done <- fn(stop)
 		}(fn)
 	}
 
 	var err error
 	for i := 0; i < cap(done); i++ {
-		if i == 0 {
+		if err == nil {
 			err = <-done
-			close(stop)
 		} else {
 			<-done
 		}
+		if i == 0 {
+			close(stop)
+		}
 	}
-	close(done)
 	return err
 }

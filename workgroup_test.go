@@ -3,37 +3,54 @@ package workgroup
 import (
 	"errors"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
-
-func TestGroup(t *testing.T) {
-	var g Group
-
-	wait := make(chan struct{})
-	err1 := errors.New("first")
-	err2 := errors.New("second")
-
-	g.Add(func(<-chan struct{}) error {
-		<-wait
-		return err1
-	})
-	g.Add(func(stop <-chan struct{}) error {
-		<-stop
-		return err2
-	})
-
-	result := make(chan error)
-	go func() {
-		result <- g.Run()
-	}()
-	close(wait)
-	assert.Equal(t, err1, <-result)
-}
 
 func TestGroupZeroValue(t *testing.T) {
 	var g Group
+	assert(t, nil, g.Run())
+}
 
-	err := g.Run()
-	assert.NoError(t, err)
+func TestGroupStopped(t *testing.T) {
+	var g Group
+
+	wait := make(chan struct{})
+	err := errors.New("err")
+
+	g.Add(func(<-chan struct{}) error {
+		<-wait
+		return err
+	})
+	g.Add(func(stop <-chan struct{}) error {
+		<-stop
+		return nil
+	})
+
+	close(wait)
+	assert(t, err, g.Run())
+}
+
+func TestGroupError(t *testing.T) {
+	var g Group
+
+	wait := make(chan struct{})
+	err := errors.New("err")
+
+	g.Add(func(<-chan struct{}) error {
+		<-wait
+		return nil
+	})
+	g.Add(func(stop <-chan struct{}) error {
+		<-stop
+		return err
+	})
+
+	close(wait)
+	assert(t, err, g.Run())
+}
+
+func assert(t *testing.T, want, got error) {
+	t.Helper()
+	if want != got {
+		t.Fatalf("expected: %v, got: %v", want, got)
+	}
 }

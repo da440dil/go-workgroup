@@ -5,6 +5,40 @@ import (
 	"testing"
 )
 
+func TestStopped(t *testing.T) {
+	wait := make(chan struct{})
+	err := errors.New("err")
+
+	f1 := func(<-chan struct{}) error {
+		<-wait
+		return err
+	}
+	f2 := func(stop <-chan struct{}) error {
+		<-stop
+		return nil
+	}
+
+	close(wait)
+	assert(t, err, Run(f1, f2))
+}
+
+func TestError(t *testing.T) {
+	wait := make(chan struct{})
+	err := errors.New("err")
+
+	f1 := func(<-chan struct{}) error {
+		<-wait
+		return nil
+	}
+	f2 := func(stop <-chan struct{}) error {
+		<-stop
+		return err
+	}
+
+	close(wait)
+	assert(t, err, Run(f1, f2))
+}
+
 func TestGroupZeroValue(t *testing.T) {
 	var g Group
 	assert(t, nil, g.Run())

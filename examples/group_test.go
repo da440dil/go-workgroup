@@ -34,4 +34,5 @@ func ExampleGroup() {
 	// one
 	// two
 	// three
+	// four
 }

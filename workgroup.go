@@ -1,12 +1,14 @@
 // Package workgroup provides synchronization for groups of related goroutines.
 package workgroup
 
+import "errors"
+
 // RunFunc is a function to execute with other related functions in its own goroutine.
 // The closure of the channel passed to RunFunc should trigger return.
 type RunFunc func(<-chan struct{}) error
 
 // Run executes each function in its own goroutine.
-// Run blocks until all functions have returned, then returns the first non-nil error (if any) from them.
+// Run blocks until all functions have returned, then returns an error that wraps all errors returned by the functions.
 // The first function to return will trigger the closure of the channel passed to each function, which should in turn, return.
 func Run(fns ...RunFunc) error {
 	if len(fns) == 0 {
@@ -25,11 +27,7 @@ func Run(fns ...RunFunc) error {
 
 	var err error
 	for i := 0; i < cap(done); i++ {
-		if err == nil {
-			err = <-done
-		} else {
-			<-done
-		}
+		err = errors.Join(err, <-done)
 		if i == 0 {
 			close(stop)
 		}
@@ -51,7 +49,7 @@ func (g *Group) Add(fn RunFunc) {
 }
 
 // Run executes each function registered via Add in its own goroutine.
-// Run blocks until all functions have returned, then returns the first non-nil error (if any) from them.
+// Run blocks until all functions have returned, then returns an error that wraps all errors returned by the functions.
 // The first function to return will trigger the closure of the channel passed to each function, which should in turn, return.
 func (g *Group) Run() error {
 	return Run(g.fns...)

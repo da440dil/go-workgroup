@@ -84,7 +84,7 @@ func TestGroupError(t *testing.T) {
 
 func assert(t *testing.T, want, got error) {
 	t.Helper()
-	if want != got {
-		t.Fatalf("expected: %v, got: %v", want, got)
+	if !errors.Is(got, want) {
+		t.Fatalf("want: %v, got: %v", want, got)
 	}
 }

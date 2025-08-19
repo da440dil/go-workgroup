@@ -1,3 +1,3 @@
 module github.com/da440dil/go-workgroup
 
-go 1.16
+go 1.20

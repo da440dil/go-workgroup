@@ -1,5 +1,7 @@
 package workgroup
 
+import "errors"
+
 // Server creates function for canceling execution.
 // First function passed in should block.
 // Second function passed in should unblock first function.
@@ -17,11 +19,7 @@ func Server(serve func() error, shutdown func() error) RunFunc {
 			return err
 		case <-stop:
 			err := shutdown()
-			if err == nil {
-				err = <-done
-			} else {
-				<-done
-			}
+			err = errors.Join(err, <-done)
 			return err
 		}
 	}

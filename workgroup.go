@@ -42,7 +42,7 @@ type Group struct {
 }
 
 // Add adds a function to the Group.
-// The function will be exectuted in its own goroutine when Run is called.
+// The function will be executed in its own goroutine when Run is called.
 // Add must be called before Run.
 func (g *Group) Add(fn RunFunc) {
 	g.fns = append(g.fns, fn)
